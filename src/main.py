@@ -6,6 +6,8 @@ import re
 from typing import Dict
 from icecream import ic
 
+ic.disable()
+
 
 # Function to create a dictionary of PDF files with a numeric prefix
 def filenames_and_prefix_from_dir(directory: str) -> Dict[str, str]:
@@ -31,8 +33,10 @@ def filenames_and_prefix_from_dir(directory: str) -> Dict[str, str]:
 
 def replace_special_names(df: pd.DataFrame) -> pd.DataFrame:
     first_column = df.columns[0]
-    df[first_column] = df[first_column].str.replace("Aus der Fünten", "Aus-der-Fünten")
-    df[first_column] = df[first_column].str.replace("Weiter", "Weiler")
+    df.loc[:, first_column] = df[first_column].str.replace(
+        "Aus der Fünten", "Aus-der-Fünten"
+    )
+    df.loc[:, first_column] = df[first_column].str.replace("Weiter", "Weiler")
     return df
 
 
@@ -51,14 +55,14 @@ def delete_first_row(df):
 def split_first_column(df: pd.DataFrame) -> pd.DataFrame:
     first_column = df.columns[0]
     # Remove the "," from the first column
-    df[first_column] = df[first_column].str.replace(",", "")
+    df.loc[:, first_column] = df[first_column].str.replace(",", "")
 
     # Check if the last 4 characters either start with '19' or '20'
     # and if yes, then create a separate column for the last 4 characters
     # and remove them from the first column
     if df[first_column].str[-4:].str.contains("19|20").all():
         df.insert(1, "Jahrg", df[first_column].str[-4:])
-        df[first_column] = df[first_column].str[:-5]
+        df.loc[:, first_column] = df[first_column].str[:-5]
     split_data = df[first_column].str.split(" ", expand=True)
     for i, col in enumerate(split_data.columns):
         df.insert(i, f"new_col_{i+1}", split_data[col])
@@ -71,13 +75,14 @@ def split_first_column(df: pd.DataFrame) -> pd.DataFrame:
 def check_first_row(df: pd.DataFrame) -> pd.DataFrame:
     first_row = df.iloc[0]
     for i, value in enumerate(first_row):
-        str_value = str(value)
-        if (
-            ("19" in str(value)[:2] or "20" in str(value)[:2])
-            and str_value[2:4].isdigit()
-            and i > 4
-        ):
-            df.insert(i, "empty column", np.nan)
+        if i < len(first_row) - 1:
+            str_value = str(value)
+            if (
+                ("19" in str(value)[:2] or "20" in str(value)[:2])
+                and str_value[2:4].isdigit()
+                and i > 4
+            ):
+                df.insert(i, "empty column", np.nan)
     return df
 
 
@@ -90,12 +95,20 @@ def rename_columns(df: pd.DataFrame) -> pd.DataFrame:
 # Function that replaces certain strings e.g. to avoid blanks
 def replace_word_1(df: pd.DataFrame) -> pd.DataFrame:
     first_column = df.columns[0]
-    df[first_column] = df[first_column].str.replace(" U", "_U")
+    df.loc[:, first_column] = df[first_column].str.replace(" U", "_U")
     return df
 
 
 def main() -> pd.DataFrame:
-    pdf_dir: str = "pdf_files"
+    # Create a dictionary of PDF files with a numeric prefix
+
+    # Get the path to the currently executing file
+    current_directory = os.path.dirname(os.path.abspath(__file__))
+
+    # Get the path to the parent directory (one level up)
+    parent_directory = os.path.dirname(current_directory)
+
+    pdf_dir: str = parent_directory + "/data/raw"
     filenames_prefix = filenames_and_prefix_from_dir(pdf_dir)
 
     result_table = []
@@ -105,7 +118,7 @@ def main() -> pd.DataFrame:
         test_table = []
         test_table = tabula.read_pdf(pdf_dir + "/" + key, pages="all")
         for df_testtable in test_table:
-            df_testtable.insert(0, "Jahr", value)
+            df_testtable.insert(len(df_testtable.columns), "Jahr", value)
         result_table.append(test_table)
 
     # tables1 = tabula.read_pdf(
